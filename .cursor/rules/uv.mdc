@@ -1,0 +1,14 @@
+---
+description: 涉及python命令或者python依赖管理时
+alwaysApply: false
+---
+- 总是使用uv来管理python依赖
+- 总是使用uv来运行python命令
+
+| 命令 | 作用 | 示例 | 特点 / 对比 |
+| --- | ---- | --- | --- |
+| **`uv add`** | 安装依赖并写入 `pyproject.toml` | `uv add requests` <br> `uv add --dev pytest` <br> `uv add --upgrade requests` | 类似 `pip install` + 自动更新依赖文件 |
+| **`uv remove`** | 卸载依赖并移除记录 | `uv remove requests` | 更干净，不会留下配置残留 |
+| **`uv sync`** | 同步环境与依赖文件 (`pyproject.toml` / `uv.lock`) | `uv sync` <br> `uv sync --upgrade` | 类似 `pip install -r requirements.txt`，但更智能 |
+| **`uv run`** | 在虚拟环境中运行命令或脚本 | `uv run python app.py` <br> `uv run pytest` | 不必手动激活虚拟环境，自动找到 `.venv` |
+| **`uv pip`** | 提供 pip 兼容接口（不改配置文件） | `uv pip install requests` <br> `uv pip list` <br> `uv pip freeze` | 给习惯 `pip` 的人过渡用；不更新 `pyproject.toml` |

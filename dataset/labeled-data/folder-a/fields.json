@@ -1,0 +1,11 @@
+{
+  "createdAt": "2025-08-25T09:57:28.458Z",
+  "drawBoxesOnImage": false,
+  "fields": [
+    {
+      "key": "co-has",
+      "label": "气体存在",
+      "type": "boolean"
+    }
+  ]
+}
