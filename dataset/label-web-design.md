@@ -3,7 +3,7 @@
 
 一、总体目标  
 1. 提供极简安装与运行体验，前后端同仓库、同端口启动。  
-2. 支持在 `dataset/raw-data/<folder>` 中任选文件夹，对其全部图片完成：「字段集标注 + 框选标注 + 预处理」，并把结果写入 `dataset/labeled-data/<同名 folder>`。  
+2. 支持在 `dataset/raw-data/<folder>` 中任选文件夹，对其全部图片完成：「预处理 + 字段集标注 + 框选标注」，并把结果写入 `dataset/labeled-data/<同名 folder>`。  
 3. 所有功能仅面向单机用户，无需鉴权。  
 4. 技术栈：Vite + React 18 + TypeScript + shadcn ui + Zustand（状态管理）+ **Node.js 18+（已在 v23 环境验证）** + Sharp（图片压缩）。  
 5. 遵循用户自定义规则：  
@@ -35,19 +35,26 @@
 ```  
    • 保存到 `fields.json`；同时复制一份到 `dataset/labeled-data/<folder>/fields.json` 作为冗余
 
-3. 图片浏览与标注  
-   • 前端分页/滑动浏览当前文件夹下所有图片  
-   • 选中图片后进入标注工作区  
-     - 左侧：标注画布 (Konva 或 fabric.js) 支持矩形框、多框（可选，可为空）  
-     - 右侧：动态渲染字段表单，表单控件映射字段集类型  
-   • 标注数据结构 `ImageLabel`：  
+3. 预处理与文件写入
+   • 在用户选择文件夹后、开始标注前，后台对 `dataset/raw-data/<folder>` 中所有图片进行预处理，生成统一 JPG 格式、符合大小/分辨率要求的新图片，保存至 `dataset/labeled-data/<folder>/images`。前端将加载这些预处理后的图片进行标注。
+   • 预处理流程：
+     1) 若原图体积 > 2 MB 或最大边 > 1920 px，使用 Sharp 等比压缩并转为 jpg；否则仅转换为 jpg（保持原尺寸）。
+     2) 保证处理后的文件名与原文件一致 (扩展名统一为 `.jpg`)。
+     3) 使用 `p-limit` 限制并行处理数量为 4，并将处理进度写入 `preprocess.log` 供前端轮询展示。
+
+4. 图片浏览与标注
+   • 前端分页或虚拟滚动浏览 `images` 文件夹下的所有图片。
+   • 选中图片后进入标注工作区：
+     - 左侧为标注画布 (基于 Konva 或 fabric.js)，支持绘制/编辑矩形框。
+     - 右侧根据 `fields.json` 动态渲染字段表单。
+   • 标注数据保存在一个文件中：`dataset/labeled-data/<folder>/labels.json`。该文件是一个对象，key 为图片名，value 为标注信息：
 ```ts
-export interface BoundingBox {   // 坐标均为相对值 0~1
+export interface BoundingBox { // 坐标均为相对值 0~1
   id: string;
-  x: number;   // 相对左上角 X，范围 0~1
-  y: number;   // 相对左上角 Y，范围 0~1
-  w: number;   // 宽度占比，范围 0~1
-  h: number;   // 高度占比，范围 0~1
+  x: number;      // 相对左上角 X
+  y: number;      // 相对左上角 Y
+  w: number;      // 宽度占比
+  h: number;      // 高度占比
   label?: string;
 }
 
@@ -55,26 +62,19 @@ export interface FieldValues { [fieldKey: string]: string | number | boolean; }
 
 export interface ImageLabel {
   imageName: string;
-  boxes?: BoundingBox[];  // 可为空或省略
+  boxes?: BoundingBox[];
   fields: FieldValues;
 }
-```  
-   • 实时保存：用户每次 `Save` 即 POST `/api/label`，后端写入  
-`dataset/labeled-data/<folder>/labels/<imageName>.json`
 
-4. 预处理与文件写入  
-   • 在用户开始标注前，后台先批量对 `dataset/raw-data/<folder>` 中所有图片进行预处理，生成 **统一 JPG** 格式、符合大小/分辨率要求的新图片至 `dataset/labeled-data/<folder>/images`，随后前端加载这些预处理后的图片进行标注。  
-   • 具体流程：  
-     1) 若原图 > 2 MB 或最大边 > 1080 px，则用 Sharp 等比压缩并转为 jpg；否则仅转换为 jpg（保持原尺寸）。  
-     2) 压缩/转换完成后，将文件名保持一致(扩展名统一 `.jpg`)。  
-     3) 若字段集 `drawBoxesOnImage=true`，则在保存图片时用 Sharp `composite()` 将标注框绘制到图片再输出。  
-     4) 标注 JSON 写入 `dataset/labeled-data/<folder>/labels/<imageName>.json`。  
-     5) 预处理过程中使用 `p-limit` 限制同时最多 4 张图片并行，防止资源占满；并将进度写入 `preprocess.log` 供前端轮询。  
-   • 额外生成（若需求）整体汇总 `labels.json` 以便后续训练  
+// labels.json 结构:
+export type LabelsFile = Record<string, ImageLabel>;
+```
+   • 保存操作：用户每次点击保存，前端 `POST /api/label/:folder/:imageName`，请求体为 `ImageLabel`。后端读取 `labels.json`，更新或插入对应图片名的条目后写回文件。
+   • 若 `fields.json` 中 `drawBoxesOnImage` 为 `true`，则在保存标注的同时，后端调用 Sharp 将标注框绘制在 `images` 文件夹对应的图片上。
 
-5. 批量完成 / 导出  
-   • 页面顶部显示进度条：已标注 / 总数  
-   • 提供「导出 ZIP」按钮：后端打包 `dataset/labeled-data/<folder>` 并下载  
+5. 批量完成 / 导出
+   • 页面顶部显示进度条：已标注 / 总数
+   • 提供「导出 ZIP」按钮：后端打包 `dataset/labeled-data/<folder>` 并下载
 
 三、系统架构  
 
@@ -147,7 +147,7 @@ llm-arena/
 • 判断逻辑：  
 ```ts
 const needResize = (meta: { size: number; width: number; height: number; }) =>
-  meta.size > 2*1024*1024 || Math.max(meta.width, meta.height) > 1080;
+  meta.size > 2*1024*1024 || Math.max(meta.width, meta.height) > 1920;
 ```  
 • 自适应压缩策略：先按 quality=90 试压缩，若仍超 2 MB，则每次降低 5 直至 75；一旦满足条件即停止，以尽量保留画质。
   伪代码：
@@ -156,7 +156,7 @@ let quality = 90;
 let buffer: Buffer;
 do {
   buffer = await sharp(src)
-    .resize({ width: 1080, height: 1080, fit: "inside" })
+    .resize({ width: 1920, height: 1920, fit: "inside" })
     .jpeg({ quality })
     .toBuffer();
   quality -= 5;

@@ -27,4 +27,4 @@ dist-ssr
 .vite/
 
 # Dataset
-dataset/raw-data
+dataset

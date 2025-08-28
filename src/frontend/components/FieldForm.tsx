@@ -1,38 +1,40 @@
+import { useState, useEffect } from 'react';
 import useAppStore from '../store/useAppStore';
 import { FieldValues } from '../types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
 
 interface FieldFormProps {
   initialValues: FieldValues;
-  onSave: (values: FieldValues) => void;
+  onFieldsChange: (newValues: FieldValues) => void;
+  onSave: () => void;
   isSaving: boolean;
 }
 
-export const FieldForm = ({ initialValues, onSave, isSaving }: FieldFormProps) => {
+export const FieldForm = ({ initialValues, onFieldsChange, onSave, isSaving }: FieldFormProps) => {
   const { fieldSet } = useAppStore();
+  const [formValues, setFormValues] = useState<FieldValues>(initialValues);
+
+  // Sync state when initialValues change (e.g., user selects a different box)
+  useEffect(() => {
+    setFormValues(initialValues);
+  }, [initialValues]);
 
   if (!fieldSet) {
     return <div>Loading field set...</div>;
   }
 
+  const handleInputChange = (key: string, value: string | boolean | number) => {
+    const newValues = { ...formValues, [key]: value };
+    setFormValues(newValues);
+    onFieldsChange(newValues); // Notify parent component of the change
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget as HTMLFormElement);
-    const values: FieldValues = {};
-    for (const [key, value] of formData.entries()) {
-      const field = fieldSet.fields.find(f => f.key === key);
-      if (field?.type === 'boolean') {
-        values[key] = value === 'on';
-      } else {
-        values[key] = value as string;
-      }
-    }
-    onSave(values);
+    onSave();
   };
 
   return (
@@ -42,16 +44,31 @@ export const FieldForm = ({ initialValues, onSave, isSaving }: FieldFormProps) =
         <div key={field.key} className="space-y-2">
           <Label htmlFor={field.key}>{field.label}</Label>
           {field.type === 'text' && (
-            <Input name={field.key} id={field.key} defaultValue={initialValues[field.key] as string || ''} />
+            <Input 
+              id={field.key} 
+              value={formValues[field.key] as string || ''} 
+              onChange={(e) => handleInputChange(field.key, e.target.value)}
+            />
           )}
           {field.type === 'boolean' && (
-            <div className="flex items-center space-x-2">
-              <Checkbox name={field.key} id={field.key} defaultChecked={!!initialValues[field.key]} />
-              <label htmlFor={field.key}>Enable</label>
-            </div>
+            <Select 
+              value={formValues[field.key] ? 'true' : 'false'} 
+              onValueChange={(value) => handleInputChange(field.key, value === 'true')}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={`Select ${field.label}...`} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">Yes</SelectItem>
+                <SelectItem value="false">No</SelectItem>
+              </SelectContent>
+            </Select>
           )}
           {field.type === 'select' && field.options && (
-            <Select name={field.key} defaultValue={initialValues[field.key] as string || ''}>
+            <Select 
+              value={formValues[field.key] as string || ''} 
+              onValueChange={(value) => handleInputChange(field.key, value)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder={`Select ${field.label}...`} />
               </SelectTrigger>
@@ -64,9 +81,8 @@ export const FieldForm = ({ initialValues, onSave, isSaving }: FieldFormProps) =
           )}
         </div>
       ))}
-      <Button type="submit" className="w-full" disabled={isSaving}>
-        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {isSaving ? 'Saving...' : 'Save Label'}
+      <Button type="submit" disabled={isSaving}>
+        {isSaving ? 'Saving...' : 'Save & Next'}
       </Button>
     </form>
   );

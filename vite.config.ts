@@ -18,7 +18,6 @@ export default defineConfig({
       '/api': {
         target: `http://localhost:${BACKEND_PORT}`,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   }

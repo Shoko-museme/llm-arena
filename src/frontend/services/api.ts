@@ -62,3 +62,17 @@ export const getLabelList = async (folder: string): Promise<string[]> => {
     throw error;
   }
 };
+
+export const resetImage = async (folder: string, imageName: string): Promise<void> => {
+  await api.post(`/reset/${folder}/${imageName}`);
+};
+
+export const initializeProcessedImage = async (folder: string, imageName: string): Promise<{ action: string; hasExistingLabel?: boolean }> => {
+  const response = await api.post(`/initialize/${folder}/${imageName}`);
+  return response.data;
+};
+
+export const rotateImage = async (folder: string, imageName: string, rotation: number): Promise<{ newRotation: number }> => {
+  const response = await api.post(`/rotate/${folder}/${imageName}`, { rotation });
+  return response.data;
+};

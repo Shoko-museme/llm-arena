@@ -48,8 +48,9 @@ export function HomePage() {
     setLabeledImages([]); // Reset progress
     try {
       const fetchedFieldSet = await getFieldSet(folder);
-      setFieldSet(fetchedFieldSet);
-      if (!fetchedFieldSet) {
+      if (fetchedFieldSet) {
+        setFieldSet(fetchedFieldSet);
+      } else {
         setIsEditorOpen(true);
       }
       // Fetch label list for progress bar
