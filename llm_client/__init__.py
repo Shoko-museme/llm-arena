@@ -6,5 +6,7 @@ LLM客户端模块
 from .base import LLMClient, LLMClientFactory
 from .aihubmix import AiHubMixClient
 from .lmstudio import LMStudioClient
+from .bigmodel import BigModelClient
+from .aliyun import AliyunClient
 
-__all__ = ["LLMClient", "LLMClientFactory", "AiHubMixClient", "LMStudioClient"]
+__all__ = ["LLMClient", "LLMClientFactory", "AiHubMixClient", "LMStudioClient", "BigModelClient", "AliyunClient"]

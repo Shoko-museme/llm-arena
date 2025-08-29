@@ -78,7 +78,7 @@ class LMStudioClient(LLMClient):
                 model=self.model_name,
                 messages=messages,
                 max_tokens=8192, # 可根据需要调整
-                temperature=0,  # 设置温度为0，获得确定性输出
+                temperature=0.1,
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -116,7 +116,7 @@ class LMStudioClient(LLMClient):
                 model=self.model_name,
                 messages=messages,
                 max_tokens=8192, # 可根据需要调整
-                temperature=0,  # 设置温度为0，获得确定性输出
+                temperature=0.1,
             )
             return response.choices[0].message.content
         except Exception as e:

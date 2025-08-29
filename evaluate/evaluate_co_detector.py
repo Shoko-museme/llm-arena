@@ -55,8 +55,8 @@ async def main():
     在 co-detector 数据集上的表现。
     """
     # --- 配置 ---
-    provider = "lmstudio"
-    model_name = "gemma-3-4b-it"
+    provider = "aliyun"
+    model_name = "qwen2.5-vl-32b-instruct"
     dataset_path = pathlib.Path("dataset/huggingface/co-detector")
     metadata_file = dataset_path / "metadata.jsonl"
 
@@ -64,7 +64,7 @@ async def main():
 便携式CO检测器外观特征: 
 - 矩形/多边形小盒子，大约巴掌大小 
 - 正面有一个小显示屏 
-- 一般顶部或正面有个较大的按钮 
+- 一般顶部或正面有个较大的按钮/旋钮
 - 颜色一般为深蓝色/黑色或者橙色 
 - 挂在胸前或腰部 
 

@@ -3,8 +3,52 @@ import json
 import pathlib
 import time
 import random
+import re
 from collections import defaultdict
 from llm_client import LLMClientFactory
+
+
+def extract_json_from_response(response: str) -> dict:
+    """
+    从模型响应中提取JSON，增强鲁棒性
+    """
+    # 方法1: 尝试提取```json代码块中的内容
+    json_pattern1 = r'```json\s*\n?(.*?)\n?\s*```'
+    match = re.search(json_pattern1, response, re.DOTALL | re.IGNORECASE)
+    if match:
+        json_str = match.group(1).strip()
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass
+    
+    # 方法2: 尝试提取```代码块中的内容（没有json标识）
+    json_pattern2 = r'```\s*\n?(.*?)\n?\s*```'
+    match = re.search(json_pattern2, response, re.DOTALL)
+    if match:
+        json_str = match.group(1).strip()
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass
+    
+    # 方法3: 查找大括号包围的JSON对象
+    json_pattern3 = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+    matches = re.findall(json_pattern3, response, re.DOTALL)
+    for match in matches:
+        try:
+            return json.loads(match.strip())
+        except json.JSONDecodeError:
+            continue
+    
+    # 方法4: 尝试直接解析整个响应（去除前后空白）
+    try:
+        return json.loads(response.strip())
+    except json.JSONDecodeError:
+        pass
+    
+    # 如果所有方法都失败，返回None
+    return None
 
 async def main():
     """
@@ -12,8 +56,8 @@ async def main():
     在 gaze-direction 数据集上的表现。
     """
     # --- 配置 ---
-    provider = "aihubmix" # 'aihubmix'
-    model_name = "gpt-5"
+    provider = "aihubmix" # 'aihubmix' or 'bigmodel' or 'lmstudio' or 'aliyun'
+    model_name = "Qwen/Qwen2.5-VL-32B-Instruct"
     dataset_path = pathlib.Path("dataset/huggingface/gaze-direction")
     metadata_file = dataset_path / "metadata.jsonl"
 
@@ -106,9 +150,13 @@ async def main():
             valid_predictions += 1
             
             # 提取 JSON 部分
-            json_response_str = response.strip().strip("```json").strip("```").strip()
+            response_data = extract_json_from_response(response)
+
+            if response_data is None:
+                print(f"  - 错误: 无法从响应中提取有效的JSON")
+                print(f"  - 原始响应: {response}")
+                continue
             
-            response_data = json.loads(json_response_str)
             predicted_label = response_data.get("gaze_direction")
 
             print(f"  - 真实标签: {ground_truth_label}")
