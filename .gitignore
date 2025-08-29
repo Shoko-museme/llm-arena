@@ -29,4 +29,6 @@ dist-ssr
 # Dataset
 dataset
 
+# others
+.env
 __pycache__/

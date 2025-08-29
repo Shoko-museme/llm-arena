@@ -1,14 +1,19 @@
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 from typing import Optional, Union, List
 from pathlib import Path
 import base64
+import os
+import asyncio
+from dotenv import load_dotenv
 from .base import LLMClient, LLMClientFactory
+
+load_dotenv()
 
 
 class AiHubMixClient(LLMClient):
     """AiHubMix LLM客户端实现"""
     
-    def __init__(self, model_name: str, api_key: str = "sk-ZLHGZGgJ77oDtOAMB0Ac03B1276843DaAaB2E68aE3D095F6"):
+    def __init__(self, model_name: str = None, api_key: str = None):
         """
         初始化AiHubMix客户端
         
@@ -16,8 +21,18 @@ class AiHubMixClient(LLMClient):
             model_name: 模型名称
             api_key: API密钥
         """
-        self.model_name = model_name
+        self.model_name = model_name or os.getenv("AIHUBMIX_MODEL_NAME", "gpt-4o-mini")
+        api_key = api_key or os.getenv("AIHUBMIX_API_KEY")
+        
+        if not api_key:
+            raise ValueError("AiHubMix API密钥未提供，请设置环境变量AIHUBMIX_API_KEY")
+        
         self.client = OpenAI(
+            api_key=api_key,
+            base_url="https://aihubmix.com/v1"
+        )
+        
+        self.async_client = AsyncOpenAI(
             api_key=api_key,
             base_url="https://aihubmix.com/v1"
         )
@@ -112,6 +127,60 @@ class AiHubMixClient(LLMClient):
             
         except Exception as e:
             raise Exception(f"AiHubMix API调用失败: {str(e)}")
+
+    async def async_fast_chat(self, text_input: str, image_path: Optional[Union[str, Path]] = None) -> str:
+        """
+        异步快速聊天功能，支持文本和图片输入
+        
+        Args:
+            text_input: 文本输入
+            image_path: 图片文件路径（可选）
+            
+        Returns:
+            LLM的回应文本
+        """
+        # 构建消息内容
+        if image_path:
+            # 有图片输入，构建多模态消息
+            image_base64 = self._encode_image(image_path)
+            mime_type = self._get_image_mime_type(image_path)
+            
+            content = [
+                {
+                    "type": "text",
+                    "text": text_input
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{mime_type};base64,{image_base64}"
+                    }
+                }
+            ]
+        else:
+            # 纯文本输入
+            content = text_input
+        
+        # 构建消息列表
+        messages = [
+            {
+                "role": "user",
+                "content": content
+            }
+        ]
+        
+        try:
+            # 调用异步API
+            response = await self.async_client.chat.completions.create(
+                messages=messages,
+                model=self.model_name
+            )
+            
+            # 返回回复内容
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            raise Exception(f"AiHubMix API异步调用失败: {str(e)}")
 
 
 # 注册AiHubMix客户端到工厂

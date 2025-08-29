@@ -19,6 +19,20 @@ class LLMClient(ABC):
             LLM的回应文本
         """
         pass
+    
+    @abstractmethod
+    async def async_fast_chat(self, text_input: str, image_path: Optional[Union[str, Path]] = None) -> str:
+        """
+        异步快速聊天功能，支持文本和图片输入
+        
+        Args:
+            text_input: 文本输入
+            image_path: 图片文件路径（可选）
+            
+        Returns:
+            LLM的回应文本
+        """
+        pass
 
 
 class LLMClientFactory:
