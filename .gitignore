@@ -29,6 +29,13 @@ dist-ssr
 # Dataset
 dataset
 
+# Unsloth
+unsloth_compiled_cache/
+unsloth_compiled_checkpoints/
+notebooks/unsloth_compiled_cache/
+notebooks/unsloth_compiled_checkpoints/
+notebooks/outputs/
+
 # others
 .env
 __pycache__/
