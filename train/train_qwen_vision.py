@@ -9,20 +9,25 @@ from unsloth.trainer import UnslothVisionDataCollator
 
 def evaluate_accuracy(model, tokenizer, eval_dataset, instruction, save_path:str|None=None) -> float:
     FastVisionModel.for_inference(model)
-    allowed_labels = {"upstream", "downstream", "clearly_diverted"}
+    allowed_chars = {"u", "d", "c"}
+    
+    # Label mapping for evaluation
+    label_mapping = {
+        "upstream": "u",
+        "downstream": "d", 
+        "clearly_diverted": "c"
+    }
 
     def extract_label(text: str) -> str | None:
-        """Extract the last occurrence of any allowed label from text, ignoring quotes/prefix."""
+        """Extract single character prediction from generated text."""
         if not text:
             return None
-        text = text.lower()
-        # direct equality after stripping punctuation / quotes
-        simple = re.sub(r'["\'`\s]', '', text)
-        if simple in allowed_labels:
-            return simple
-        # find all occurrences, pick the last (often the real answer at end)
-        matches = re.findall(r"(upstream|downstream|clearly_diverted)", text)
-        return matches[-1] if matches else None
+        text = text.lower().strip()
+        # Look for the first occurrence of allowed characters
+        for char in text:
+            if char in allowed_chars:
+                return char
+        return None
 
     correct = 0
     total = len(eval_dataset)
@@ -30,7 +35,8 @@ def evaluate_accuracy(model, tokenizer, eval_dataset, instruction, save_path:str
 
     for idx, sample in enumerate(eval_dataset):
         image = sample["image"]
-        gold = str(sample["gaze_direction"]).strip().lower()
+        gaze_direction = str(sample["gaze_direction"]).strip().lower()
+        gold = label_mapping.get(gaze_direction, "c")  # map to single character
         messages = [
             {"role": "user", "content": [
                 {"type": "image"},
@@ -47,7 +53,7 @@ def evaluate_accuracy(model, tokenizer, eval_dataset, instruction, save_path:str
         with torch.no_grad():
             generated_ids = model.generate(
                 **inputs,
-                max_new_tokens=32,
+                max_new_tokens=2,  # Only need 1-2 tokens for single character output
                 use_cache=True,
                 temperature=0.0,
                 top_p=1.0,
@@ -62,7 +68,8 @@ def evaluate_accuracy(model, tokenizer, eval_dataset, instruction, save_path:str
             correct += 1
         detailed_results.append({
             "index": idx,
-            "gold": gold,
+            "original_label": gaze_direction,  # original full label
+            "gold": gold,  # mapped single character
             "prediction": pred,
             "raw_text": text,
             "correct": is_correct,
@@ -96,7 +103,10 @@ def main():
     eval_dataset = split_dataset['test']
 
     instruction = """**Image Description:** A surveillance camera view from a steel mill. The upper part of the image shows a section of a steel rolling line, consisting of a conveyor track that runs from left to right and multiple rolling mills. Steel billets from upstream (outside the left of the frame) are conveyed through the mills and rolled into bars.
-**Task:** Determine the gaze direction of the person marked with a red box in the surveillance image (looking towards the upstream direction of the rolling line | looking towards the downstream direction of the rolling line | gaze clearly diverted from the rolling line) and output one of the following labels: "upstream", "downstream", or "clearly_diverted".
+**Task:** Determine the gaze direction of the person marked with a red box in the surveillance image. Output exactly one character:
+- 'u' if looking towards the upstream direction of the rolling line
+- 'd' if looking towards the downstream direction of the rolling line  
+- 'c' if gaze clearly diverted from the rolling line
 """
 
     # ---------- Pre-training evaluation ----------
@@ -121,6 +131,15 @@ def main():
     )
 
     def convert_to_conversation(sample):
+        # Map full labels to single characters
+        label_mapping = {
+            "upstream": "u",
+            "downstream": "d", 
+            "clearly_diverted": "c"
+        }
+        gaze_direction = str(sample["gaze_direction"]).strip().lower()
+        single_char_label = label_mapping.get(gaze_direction, "c")  # default to 'c' if unknown
+        
         conversation = [
             {
                 "role": "user",
@@ -132,7 +151,7 @@ def main():
             {
                 "role": "assistant",
                 "content": [
-                    {"type": "text", "text": sample["gaze_direction"]}
+                    {"type": "text", "text": single_char_label}
                 ]
             },
         ]
